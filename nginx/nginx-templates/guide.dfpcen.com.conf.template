@@ -1,0 +1,16 @@
+# guide.dfpcen.com.conf.template 파일
+server {
+#  listen       ${NGINX_PORT}; # docker-compose.yml에서 환경변수로 치환 가능
+  listen 8080;
+  server_name  guide.dfpcen.com;
+
+  #charset koi8-r;
+  access_log  /var/log/nginx/guide.dfpcen.com.access.log  main;
+
+  location / {
+      root   /usr/share/nginx/html/guide.dfpcen.com;
+      index  index.html index.htm;
+  }
+
+  
+}

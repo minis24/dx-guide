@@ -1,0 +1,16 @@
+# default.conf.template 파일
+server {
+#  listen       ${NGINX_PORT}; # docker-compose.yml에서 환경변수로 치환 가능
+  listen       8080; # docker-compose.yml에서 환경변수로 치환 가능
+  server_name  localhost;
+
+  #charset koi8-r;
+  access_log  /var/log/nginx/default.access.log  main;
+
+  location / {
+      root   /usr/share/nginx/html;
+      index  index.html index.htm;
+  }
+
+
+}

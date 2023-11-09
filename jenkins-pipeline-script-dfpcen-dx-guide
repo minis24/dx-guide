@@ -1,0 +1,137 @@
+pipeline {
+    agent any
+    
+    
+    environment { 
+        PROJECT_NAME="dfpcen-dx-guide"
+ //----------------------------------------------------------
+ //git - AWS CodeCommit 
+ //----------------------------------------------------------
+                   
+        GIT_BASE_URL="https://git-codecommit.ap-northeast-2.amazonaws.com/v1/repos"
+        GIT_URL="$GIT_BASE_URL/$PROJECT_NAME"
+        GIT_BRANCH_NAME="main"
+ //       GIT_BRANCH_NAME="dev/jkkim"
+        GIT_CREDENTIAL_ID="codecommit-main"
+ //----------------------------------------------------------
+ //Docker Hub - AWS ECR (Elacstic Container Registry)
+ //----------------------------------------------------------      
+        AWS_ECR_REPOSITORY="615314566947.dkr.ecr.ap-northeast-2.amazonaws.com/$PROJECT_NAME"
+        AWS_ECR_CREDENTIALS="ecr:ap-northeast-2:aws_ecr_credential" 
+ //----------------------------------------------------------
+ //AWS CodeCommit 
+ //----------------------------------------------------------        
+        AWS_CODEDEPLOY_APPLICATION_NAME="$PROJECT_NAME"
+        AWS_CODEDEPLOY_GROUP_NAME="$AWS_CODEDEPLOY_APPLICATION_NAME-group"    
+        AWS_ACCESS_KEY_ID=credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY=credentials('AWS_SECRET_ACCESS_KEY')
+
+    }
+   
+    tools {
+        maven "maven"
+    }
+
+    stages {
+
+        stage('PWD') {
+            steps {
+                sh 'echo pwd'
+            }
+        }// stage "PWD"
+
+
+
+
+        stage('git pull') {
+            steps {
+
+                sh 'echo GIT_BRANCH_NAME = $GIT_BRANCH_NAME' 
+                git credentialsId: "$GIT_CREDENTIAL_ID",
+                branch:"$GIT_BRANCH_NAME" ,
+                url: "$GIT_URL"
+            }
+        } // stage "git pull"
+ 
+
+
+        stage('npm module install') {
+            steps {
+                sh 'echo npm i'
+                sh 'npm i'
+
+            }
+        }// stage "npm module install"
+
+
+
+        stage('npm build') {
+            steps {
+                sh 'pwd'
+                sh 'npm run docs:build'
+                sh 'tar cvf dist.tar /var/jenkins_home/workspace/dfpcen-dx-guide/docs/.vitepress/dist/'
+
+            }
+        }// stage "npm build"
+
+
+
+        stage("AWS ECR image build") {
+            steps { 
+                script {
+                    sh 'echo DOCKERHUB_CREDENTIALS = $DOCKERHUB_CREDENTIALS' 
+                    sh 'echo BUILD_NUMBER = $BUILD_NUMBER' 
+                    sh 'aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 615314566947.dkr.ecr.ap-northeast-2.amazonaws.com'
+                    dockerImage = docker.build("$AWS_ECR_REPOSITORY")
+                }
+            }
+        }// stage "docker image build"
+
+
+        stage("AWS ECR push") {
+            steps { 
+                script {
+                    
+                    sh 'echo AWS ECR image push' 
+                    docker.withRegistry("https://$AWS_ECR_REPOSITORY", "$AWS_ECR_CREDENTIALS") {
+                        dockerImage.push("${env.BUILD_NUMBER}") 
+                        dockerImage.push("latest") 
+                    }
+                    
+                }
+               
+            }
+
+        }// stage "AWS ECR image push"
+
+
+
+        stage("AWS CodeDeploy") {
+            steps { 
+                script {
+                        sh ''' 
+                            echo aws deploy create-deployment \
+                            --application-name $AWS_CODEDEPLOY_APPLICATION_NAME \
+                            --deployment-group-name $AWS_CODEDEPLOY_GROUP_NAME \
+                            --s3-location bucket=codedploy-dfpcen,key=codedeploy-dfpcen-dx-guide.zip,bundleType=zip
+                            '''
+                        sh '''
+                            aws deploy create-deployment \
+                            --application-name $AWS_CODEDEPLOY_APPLICATION_NAME \
+                            --deployment-group-name $AWS_CODEDEPLOY_GROUP_NAME  \
+                            --s3-location bucket=codedploy-dfpcen,key=codedeploy-dfpcen-dx-guide.zip,bundleType=zip
+                            '''
+                        //aws deploy create-deployment --application-name $AWS_CODEDEPLOY_APPLICATION_NAME --deployment-group-name $AWS_CODEDEPLOY_GROUP_NAME --s3-location bucket=codedploy-dfpcen,key=codedeploy-dfpcen-api-pilot.zip,bundleType=zip
+                }
+                   
+        
+                    
+              }
+
+            }// stage "AWS CodeDeploy"
+        
+    } //stages
+}//pipeline
+
+
+

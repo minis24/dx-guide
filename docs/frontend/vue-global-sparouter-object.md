@@ -1,0 +1,1 @@
+# spa.router 전역 객체
